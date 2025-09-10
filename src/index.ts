@@ -7,8 +7,8 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const polGithubNotifications = process.env.polGithubNotifications; // default space
-const polGithubNotificationsQA = process.env.polGithubNotificationsQA; // QA private space
+const polGithubNotifications = process.env.polGithubNotifications;
+const polGithubNotificationsQA = process.env.polGithubNotificationsQA;
 
 app.post("/github-webhook", async (req, res) => {
     try {
@@ -28,8 +28,9 @@ app.post("/github-webhook", async (req, res) => {
             return res.status(200).send("Not rise-pol repo");
         }
 
+        // Choose webhook based on labels
         let targetWebhook = polGithubNotifications;
-        if (pr.labels.some((label: any) => label.name === "QA")) {
+        if (pr.labels.some((label: any) => label.name.toUpperCase() === "QA")) {
             targetWebhook = polGithubNotificationsQA;
         }
 
