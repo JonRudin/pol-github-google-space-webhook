@@ -22,7 +22,7 @@ app.post("/github-webhook", async (req, res) => {
             return res.status(200).send("Not a PR event");
         }
 
-        if (repo.full_name !== "rise-pol") {
+        if (repo.full_name !== "ovotech/rise-pol") {
             console.log(`PR #${pr.number} skipped (repo ${repo.full_name} not rise-pol)`);
             return res.status(200).send("Not rise-pol repo");
         }
