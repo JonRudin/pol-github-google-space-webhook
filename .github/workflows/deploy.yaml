@@ -1,0 +1,64 @@
+name: Deploy to GCP Sandbox
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      PROJECT_ID: rise-sandbox
+      REGION: europe-west2
+      CLUSTER_ZONE: europe-west2-a
+      CLUSTER_NAME: rise-sandbox
+      IMAGE_NAME: pol-github-google-space-webhook
+      NAMESPACE: pol-github-google-space-webhook
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Docker to use gcloud
+        run: |
+          gcloud auth configure-docker $REGION-docker.pkg.dev
+
+      - name: Build and push Docker image
+        run: |
+          docker buildx build -t $IMAGE_NAME --platform=linux/amd64 .
+          docker tag $IMAGE_NAME $REGION-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME/latest
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME/latest
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE --project $PROJECT_ID
+
+      - name: Install gke-gcloud-auth-plugin
+        run: |
+          curl -sSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+          echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
+          sudo apt-get update
+          sudo apt-get install -y google-cloud-cli-gke-gcloud-auth-plugin
+
+      - name: Create Kubernetes Secret
+        run: |
+          kubectl create secret generic pol-github-google-space-webhook-secrets \
+            --from-literal=polGithubNotifications=${{ secrets.POL_GITHUB_NOTIFICATIONS }} \
+            --namespace=$NAMESPACE \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply Kubernetes configs
+        run: |
+          kubectl apply -f k8s/deployment.yaml -n $NAMESPACE
+          kubectl apply -f k8s/service.yaml -n $NAMESPACE
+          kubectl rollout restart deployment $IMAGE_NAME -n $NAMESPACE

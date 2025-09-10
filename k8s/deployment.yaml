@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pol-github-google-space-webhook
+  namespace: pol-github-google-space-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pol-github-google-space-webhook
+  template:
+    metadata:
+      labels:
+        app: pol-github-google-space-webhook
+    spec:
+      containers:
+        - name: pol-github-google-space-webhook
+          image: europe-west2-docker.pkg.dev/rise-sandbox/pol-github-google-space-webhook/latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "8080"
+          envFrom:
+            - secretRef:
+                name: pol-github-google-space-webhook-secrets
