@@ -7,7 +7,8 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const polGithubNotifications = process.env.polGithubNotifications;
+const polGithubNotifications = process.env.polGithubNotifications; // default space
+const polGithubNotificationsQA = process.env.polGithubNotificationsQA; // QA private space
 
 app.post("/github-webhook", async (req, res) => {
     try {
@@ -27,8 +28,13 @@ app.post("/github-webhook", async (req, res) => {
             return res.status(200).send("Not rise-pol repo");
         }
 
+        let targetWebhook = polGithubNotifications;
+        if (pr.labels.some((label: any) => label.name === "QA")) {
+            targetWebhook = polGithubNotificationsQA;
+        }
+
         const chatMessage = {
-            text: `🐙 *GitHub PR Update*
+            text: `*GitHub PR Update*
 
 *Action:* ${action}
 *Title:* ${pr.title}
@@ -39,7 +45,7 @@ app.post("/github-webhook", async (req, res) => {
 [View PR](${pr.html_url})`
         };
 
-        await axios.post(polGithubNotifications!, chatMessage);
+        await axios.post(targetWebhook!, chatMessage);
         console.log(`✅ Sent PR #${pr.number} update to Google Chat`);
         res.status(200).send("Forwarded");
     } catch (err: unknown) {
