@@ -36,10 +36,7 @@ app.post("/github-webhook", async (req, res) => {
 *Repo:* ${repo.full_name}
 *PR #:* ${pr.number}
 
-[View PR](${pr.html_url})`,
-            thread: {
-                threadKey: `pr-${repo.full_name}-${pr.number}`,
-            },
+[View PR](${pr.html_url})`
         };
 
         await axios.post(polGithubNotifications!, chatMessage);
