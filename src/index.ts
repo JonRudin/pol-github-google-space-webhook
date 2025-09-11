@@ -7,8 +7,10 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const polGithubNotifications = process.env.polGithubNotifications;
-const polGithubNotificationsQA = process.env.polGithubNotificationsQA;
+const defaultWebhook = process.env.polGithubNotifications;
+const qaWebhook = process.env.polGithubNotificationsQA;
+
+const allowPrActions = new Set(["opened", "closed"]);
 
 app.post("/github-webhook", async (req, res) => {
     try {
@@ -19,19 +21,12 @@ app.post("/github-webhook", async (req, res) => {
 
         console.log(`➡️ Incoming GitHub event: ${event}, action: ${action}`);
 
-        if (event !== "pull_request" || !pr) {
-            return res.status(200).send("Not a PR event");
+        if (event !== "pull_request" || !pr || repo?.full_name !== "ovotech/rise-pol") {
+            return res.status(200).send("Not a PR event for rise-pol");
         }
 
-        if (repo.full_name !== "ovotech/rise-pol") {
-            console.log(`PR #${pr.number} skipped (repo ${repo.full_name} not rise-pol)`);
-            return res.status(200).send("Not rise-pol repo");
-        }
-
-        // Choose webhook based on labels
-        let targetWebhook = polGithubNotifications;
-        if (pr.labels.some((label: any) => label.name.toUpperCase() === "QA")) {
-            targetWebhook = polGithubNotificationsQA;
+        if (!allowPrActions.has(action)) {
+            return res.status(200).send("Ignored PR action");
         }
 
         const chatMessage = {
@@ -46,8 +41,19 @@ app.post("/github-webhook", async (req, res) => {
 [View PR](${pr.html_url})`
         };
 
-        await axios.post(targetWebhook!, chatMessage);
-        console.log(`✅ Sent PR #${pr.number} update to Google Chat`);
+        await axios.post(defaultWebhook!, chatMessage);
+
+        const hasQaLabel = pr.labels?.some(
+            (label: any) => label.name.toUpperCase() === "QA"
+        );
+
+        if (hasQaLabel) {
+            await axios.post(qaWebhook!, chatMessage);
+            console.log(`✅ PR #${pr.number}: sent to BOTH default + QA channels`);
+        } else {
+            console.log(`✅ PR #${pr.number}: sent to default channel`);
+        }
+
         res.status(200).send("Forwarded");
     } catch (err: unknown) {
         if (axios.isAxiosError(err)) {
