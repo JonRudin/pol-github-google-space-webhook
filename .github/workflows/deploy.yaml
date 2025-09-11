@@ -54,6 +54,7 @@ jobs:
         run: |
           kubectl create secret generic pol-github-google-space-webhook-secrets \
             --from-literal=polGithubNotifications=${{ secrets.POL_GITHUB_NOTIFICATIONS }} \
+            --from-literal=polGithubNotificationsQA=${{ secrets.POL_GITHUB_NOTIFICATIONS_QA }} \
             --namespace=$NAMESPACE \
             --dry-run=client -o yaml | kubectl apply -f -
 
