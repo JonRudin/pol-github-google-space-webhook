@@ -29,17 +29,28 @@ app.post("/github-webhook", async (req, res) => {
             return res.status(200).send("Ignored PR action");
         }
 
-        const chatMessage = {
-            text: `*GitHub PR Update*
+        const labels = pr.labels?.map((label: any) => label.name).join(", ");
+        const assignees = pr.assignees?.map((assignee: any) => assignee.login).join(", ");
+
+        let text = `*GitHub PR Update*
 
 *Action:* ${action}
 *Title:* ${pr.title}
 *Author:* ${pr.user.login}
 *Repo:* ${repo.full_name}
 *PR #:* ${pr.number}
+*Labels:* ${labels || 'None'}`;
 
-[View PR](${pr.html_url})`
-        };
+        if (assignees) {
+            text += `
+*Assignees:* ${assignees}`;
+        }
+
+        text += `
+
+[View PR](${pr.html_url})`;
+
+        const chatMessage = { text };
 
         await axios.post(defaultWebhook!, chatMessage);
 
