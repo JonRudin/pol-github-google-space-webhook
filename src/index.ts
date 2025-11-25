@@ -52,17 +52,21 @@ app.post("/github-webhook", async (req, res) => {
 
         const chatMessage = { text };
 
-        await axios.post(defaultWebhook!, chatMessage);
+        const threadKey = `pr-${repo.full_name}-${pr.number}`;
+        const defaultWebhookUrl = `${defaultWebhook}&threadKey=${threadKey}`;
+
+        await axios.post(defaultWebhookUrl, chatMessage);
 
         const hasQaLabel = pr.labels?.some(
             (label: any) => label.name.toUpperCase() === "QA"
         );
 
         if (hasQaLabel) {
-            await axios.post(qaWebhook!, chatMessage);
-            console.log(`✅ PR #${pr.number}: sent to BOTH default + QA channels`);
+            const qaWebhookUrl = `${qaWebhook}&threadKey=${threadKey}`;
+            await axios.post(qaWebhookUrl, chatMessage);
+            console.log(`✅ PR #${pr.number}: sent to BOTH default + QA channels (in thread)`);
         } else {
-            console.log(`✅ PR #${pr.number}: sent to default channel`);
+            console.log(`✅ PR #${pr.number}: sent to default channel (in thread)`);
         }
 
         res.status(200).send("Forwarded");
