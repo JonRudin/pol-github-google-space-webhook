@@ -50,20 +50,24 @@ app.post("/github-webhook", async (req, res) => {
 
 [View PR](${pr.html_url})`;
 
-        const chatMessage = { text };
-
         const threadKey = `pr-${repo.full_name}-${pr.number}`;
-        const defaultWebhookUrl = `${defaultWebhook}&threadKey=${threadKey}`;
+        const chatMessage = {
+            text,
+            thread: {
+                threadKey: threadKey,
+            },
+        };
 
-        await axios.post(defaultWebhookUrl, chatMessage);
+        if (defaultWebhook) {
+            await axios.post(defaultWebhook, chatMessage);
+        }
 
         const hasQaLabel = pr.labels?.some(
             (label: any) => label.name.toUpperCase() === "QA"
         );
 
-        if (hasQaLabel) {
-            const qaWebhookUrl = `${qaWebhook}&threadKey=${threadKey}`;
-            await axios.post(qaWebhookUrl, chatMessage);
+        if (hasQaLabel && qaWebhook) {
+            await axios.post(qaWebhook, chatMessage);
             console.log(`✅ PR #${pr.number}: sent to BOTH default + QA channels (in thread)`);
         } else {
             console.log(`✅ PR #${pr.number}: sent to default channel (in thread)`);
