@@ -12,6 +12,14 @@ const qaWebhook = process.env.polGithubNotificationsQA;
 
 const allowPrActions = new Set(["opened", "closed"]);
 
+const getWebhookUrlWithThreadKey = (webhookUrl: string | undefined, threadKey: string) => {
+    if (!webhookUrl) {
+        return "";
+    }
+    const separator = webhookUrl.includes("?") ? "&" : "?";
+    return `${webhookUrl}${separator}threadKey=${threadKey}&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD`;
+};
+
 app.post("/github-webhook", async (req, res) => {
     try {
         const event = req.headers["x-github-event"];
@@ -50,25 +58,25 @@ app.post("/github-webhook", async (req, res) => {
 
 [View PR](${pr.html_url})`;
 
-        const threadKey = `pr-${repo.full_name}-${pr.number}`;
-        const chatMessage = {
-            text,
-            thread: {
-                threadKey: threadKey,
-            },
-        };
+        const chatMessage = { text };
 
-        if (defaultWebhook) {
-            await axios.post(defaultWebhook, chatMessage);
+        const threadKey = `pr-${repo.full_name.replace(/\//g, '-')}-${pr.number}`;
+        const defaultWebhookUrl = getWebhookUrlWithThreadKey(defaultWebhook, threadKey);
+
+        if (defaultWebhookUrl) {
+            await axios.post(defaultWebhookUrl, chatMessage);
         }
 
         const hasQaLabel = pr.labels?.some(
             (label: any) => label.name.toUpperCase() === "QA"
         );
 
-        if (hasQaLabel && qaWebhook) {
-            await axios.post(qaWebhook, chatMessage);
-            console.log(`✅ PR #${pr.number}: sent to BOTH default + QA channels (in thread)`);
+        if (hasQaLabel) {
+            const qaWebhookUrl = getWebhookUrlWithThreadKey(qaWebhook, threadKey);
+            if (qaWebhookUrl) {
+                await axios.post(qaWebhookUrl, chatMessage);
+                console.log(`✅ PR #${pr.number}: sent to BOTH default + QA channels (in thread)`);
+            }
         } else {
             console.log(`✅ PR #${pr.number}: sent to default channel (in thread)`);
         }
