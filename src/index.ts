@@ -10,8 +10,6 @@ app.use(express.json());
 const defaultWebhook = process.env.polGithubNotifications;
 const qaWebhook = process.env.polGithubNotificationsQA;
 
-const allowPrActions = new Set(["opened", "closed"]);
-
 const getWebhookUrlWithThreadKey = (webhookUrl: string | undefined, threadKey: string) => {
     if (!webhookUrl) {
         return "";
@@ -24,23 +22,23 @@ app.post("/github-webhook", async (req, res) => {
     try {
         const event = req.headers["x-github-event"];
         const action = req.body.action;
-        const pr = req.body.pull_request;
         const repo = req.body.repository;
+        const pr = req.body.pull_request;
 
         console.log(`➡️ Incoming GitHub event: ${event}, action: ${action}`);
 
-        if (event !== "pull_request" || !pr || repo?.full_name !== "ovotech/rise-pol") {
+        if (repo?.full_name !== "ovotech/rise-pol") {
             return res.status(200).send("Not a PR event for rise-pol");
         }
 
-        if (!allowPrActions.has(action)) {
-            return res.status(200).send("Ignored PR action");
-        }
+        let chatMessage;
+        let threadKey;
 
-        const labels = pr.labels?.map((label: any) => label.name).join(", ");
-        const assignees = pr.assignees?.map((assignee: any) => assignee.login).join(", ");
+        if (event === "pull_request" && (action === "opened" || action === "closed")) {
+            const labels = pr.labels?.map((label: any) => label.name).join(", ");
+            const assignees = pr.assignees?.map((assignee: any) => assignee.login).join(", ");
 
-        let text = `*GitHub PR Update*
+            let text = `*GitHub PR Update*
 
 *Action:* ${action}
 *Title:* ${pr.title}
@@ -49,36 +47,48 @@ app.post("/github-webhook", async (req, res) => {
 *PR #:* ${pr.number}
 *Labels:* ${labels || 'None'}`;
 
-        if (assignees) {
-            text += `
+            if (assignees) {
+                text += `
 *Assignees:* ${assignees}`;
-        }
+            }
 
-        text += `
+            text += `
 
 [View PR](${pr.html_url})`;
 
-        const chatMessage = { text };
+            chatMessage = { text };
+            threadKey = `pr-${repo.full_name.replace(/\//g, '-')}-${pr.number}`;
 
-        const threadKey = `pr-${repo.full_name.replace(/\//g, '-')}-${pr.number}`;
-        const defaultWebhookUrl = getWebhookUrlWithThreadKey(defaultWebhook, threadKey);
-
-        if (defaultWebhookUrl) {
-            await axios.post(defaultWebhookUrl, chatMessage);
+        } else if (event === "pull_request_review" && action === "submitted" && req.body.review.state === "approved") {
+            const review = req.body.review;
+            const user = review.user.login;
+            const text = `${user} approved this PR ✅`;
+            chatMessage = { text };
+            threadKey = `pr-${repo.full_name.replace(/\//g, '-')}-${pr.number}`;
+        } else {
+            return res.status(200).send("Ignored event");
         }
 
-        const hasQaLabel = pr.labels?.some(
-            (label: any) => label.name.toUpperCase() === "QA"
-        );
+        if (chatMessage && threadKey) {
+            const defaultWebhookUrl = getWebhookUrlWithThreadKey(defaultWebhook, threadKey);
 
-        if (hasQaLabel) {
-            const qaWebhookUrl = getWebhookUrlWithThreadKey(qaWebhook, threadKey);
-            if (qaWebhookUrl) {
-                await axios.post(qaWebhookUrl, chatMessage);
-                console.log(`✅ PR #${pr.number}: sent to BOTH default + QA channels (in thread)`);
+            if (defaultWebhookUrl) {
+                await axios.post(defaultWebhookUrl, chatMessage);
             }
-        } else {
-            console.log(`✅ PR #${pr.number}: sent to default channel (in thread)`);
+
+            const hasQaLabel = pr.labels?.some(
+                (label: any) => label.name.toUpperCase() === "QA"
+            );
+
+            if (hasQaLabel) {
+                const qaWebhookUrl = getWebhookUrlWithThreadKey(qaWebhook, threadKey);
+                if (qaWebhookUrl) {
+                    await axios.post(qaWebhookUrl, chatMessage);
+                    console.log(`✅ PR #${pr.number}: sent to BOTH default + QA channels (in thread)`);
+                }
+            } else {
+                console.log(`✅ PR #${pr.number}: sent to default channel (in thread)`);
+            }
         }
 
         res.status(200).send("Forwarded");
