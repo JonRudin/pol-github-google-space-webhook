@@ -6,8 +6,8 @@ set -euo pipefail
 cmd=$(jq -r '.tool_input.command // ""')
 
 case "$cmd" in
-  *"git commit"*) ;;
-  *) exit 0 ;;
+*"git commit"*) ;;
+*) exit 0 ;;
 esac
 
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
@@ -15,8 +15,10 @@ branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 # Resolve the repo's default branch (origin/HEAD), falling back to main/master.
 default=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
 if [ -z "$default" ]; then
-  if git show-ref --verify --quiet refs/heads/main; then default="main"
-  elif git show-ref --verify --quiet refs/heads/master; then default="master"
+  if git show-ref --verify --quiet refs/heads/main; then
+    default="main"
+  elif git show-ref --verify --quiet refs/heads/master; then
+    default="master"
   else default="main"; fi
 fi
 
