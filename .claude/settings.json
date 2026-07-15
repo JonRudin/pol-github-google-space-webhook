@@ -1,0 +1,59 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm ci)",
+      "Bash(npm run dev)",
+      "Bash(npm run build)",
+      "Bash(npm start)",
+      "Bash(npx tsc*)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh run view *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(grep *)",
+      "Bash(wc *)",
+      "Write(.claude/tmp/**)",
+      "mcp__atlassian__*"
+    ],
+    "deny": [
+      "Bash(env)",
+      "Bash(git clone*)",
+      "Bash(git remote add*)",
+      "Bash(git remote set-url*)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)"
+    ],
+    "ask": ["Bash(curl:*)", "Bash(git push*)", "Bash(git pull*)", "Bash(git fetch*)"],
+    "additionalDirectories": ["/tmp/claude", "/private/tmp/claude"]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-commit-to-main.sh\""
+          }
+        ]
+      }
+    ]
+  },
+  "enabledMcpjsonServers": ["atlassian"],
+  "extraKnownMarketplaces": {
+    "ovo-claude-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "ovotech/ovo-claude-plugins"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "ovo-core@ovo-claude-plugins": true,
+    "devops@ovo-claude-plugins": true
+  }
+}
